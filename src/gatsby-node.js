@@ -14,8 +14,12 @@ exports.sourceNodes = async (
   delete configOptions.plugins
   const { serviceAccountEmail, folderId } = configOptions
 
+  // Needed to add keys to Netlify's environment variable UI
+  // https://stackoverflow.com/questions/36636245/error-signing-jwt-using-rsa-private-key-loaded-from-env-file-via-heroku-foreman
+  const key = configOptions.key.replace(/\\n/g, '\n');
+
   // Get token and fetch root folder.
-  const token = await googleapi.getToken(configOptions.key, serviceAccountEmail)
+  const token = await googleapi.getToken(key, serviceAccountEmail)
   const cmsFiles = await googleapi.getFolder(folderId, token)
 
   for (const file of cmsFiles) {
