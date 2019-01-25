@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "babel-runtime": "^6.26.0",
+    "gatsby-source-filesystem": "^2.0.17",
     "gtoken": "^2.3.2",
     "mkdirp": "^0.5.1",
     "request": "^2.87.0",
