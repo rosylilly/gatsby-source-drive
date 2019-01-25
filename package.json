@@ -31,6 +31,7 @@
     "gatsby-source-filesystem": "^2.0.17",
     "gtoken": "^2.3.2",
     "mkdirp": "^0.5.1",
+    "node-fetch": "^2.3.0",
     "request": "^2.87.0",
     "rimraf": "^2.6.2"
   }
