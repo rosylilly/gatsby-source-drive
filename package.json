@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "babel-runtime": "^6.26.0",
-    "gtoken": "^2.3.0",
+    "gtoken": "^2.3.2",
     "mkdirp": "^0.5.1",
     "request": "^2.87.0",
     "rimraf": "^2.6.2"
