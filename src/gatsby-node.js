@@ -1,76 +1,83 @@
 const googleapi = require(`./googleapis`);
-const path = require(`path`);
-const rimraf = require(`rimraf`);
-const mkdirp = require(`mkdirp`);
-const fs = require(`fs`);
+const fetch = require(`node-fetch`)
+const crypto = require(`crypto`)
+const path = require(`path`)
+const createRemoteFileNode = require(`gatsby-source-filesystem`).createRemoteFileNode
 
-const log = str => console.log(`\n\n🚗 `, str);
 const FOLDER = `application/vnd.google-apps.folder`;
 
-exports.onPreBootstrap = (
-  { graphql, actions },
-  { folderId, keyFile, destination }
+exports.sourceNodes = async (
+  { actions, createNodeId, createContentDigest }, configOptions
 ) => {
-  return new Promise(async resolve => {
-    log(`Started downloading content`);
+  const { createNode } = actions
+  // Gatsby adds a configOption that's not needed for this plugin, delete it
+  delete configOptions.plugins
+  const { serviceAccountEmail, folderId } = configOptions
 
-    // Get token and fetch root folder.
-    const token = await googleapi.getToken(keyFile);
-    const cmsFiles = await googleapi.getFolder(folderId, token);
+  // Get token and fetch root folder.
+  const token = await googleapi.getToken(configOptions.key, serviceAccountEmail)
+  const cmsFiles = await googleapi.getFolder(folderId, token)
 
-    // Create content directory if it doesn't exist.
-    mkdirp(destination);
-
-    // Start downloading recursively through all folders.
-    console.time(`Downloading content`);
-    recursiveFolders(cmsFiles, undefined, token, destination).then(() => {
-      console.timeEnd(`Downloading content`);
-      resolve();
-    });
-  });
-};
-
-function recursiveFolders(array, parent = '', token, destination) {
-  return new Promise(async (resolve, reject) => {
-    let promises = [];
-
-    for (let file of array) {
-      // Check if it`s a folder or a file
-      if (file.mimeType === FOLDER) {
-        // If it`s a folder, create it in filesystem
-        log(`Creating folder ${parent}/${file.name}`);
-        mkdirp(path.join(destination, parent, file.name));
-
-        // Then, get the files inside and run the function again.
-        const files = await googleapi.getFolder(file.id, token);
-        promises.push(
-          recursiveFolders(files, `${parent}/${file.name}`, token, destination)
-        );
-      } else {
-        promises.push(
-          new Promise(async (resolve, reject) => {
-            // If it`s a file, download it and convert to buffer.
-            const dest = path.join(destination, parent, file.name);
-
-            if (fs.existsSync(dest)) {
-              resolve(file.name);
-              return log(`Using cached ${file.name}`);
-            }
-
-            const buffer = await googleapi.getFile(file.id, token);
-
-            // Finally, write buffer to file.
-            fs.writeFile(dest, buffer, err => {
-              if (err) return log(err);
-
-              log(`Saved file ${file.name}`);
-              resolve(file.name);
-            });
-          })
-        );
-      }
+  for (const file of cmsFiles) {
+    if (file.mimeType !== FOLDER) {
+      const nodeId = createNodeId(`drive-file-${file.id}`)
+      const nodeContent = JSON.stringify(file)
+      const nodeContentDigest = crypto
+        .createHash("md5")
+        .update(nodeContent)
+        .digest("hex")
+      const resp = await googleapi.getFile(file.id, token)
+      const {
+        webContentLink,
+        createdTime
+      } = JSON.parse(resp)
+      const node = Object.assign({}, file, {
+        id: nodeId,
+        parent: `__SOURCE__`,
+        children: [],
+        url: webContentLink.split('&')[0],
+        createdTime,
+        internal: {
+          type: `DriveNode`,
+          mediaType: file.mimeType,
+          content: nodeContent,
+          contentDigest: nodeContentDigest
+        },
+        name: file.name,
+      })
+      createNode(node)
     }
+  }
+}
 
-    Promise.all(promises).then(() => resolve());
-  });
+exports.onCreateNode = async function ({  node, cache, actions, store, createNodeId }) {
+  let fileNode
+  const { createNode, createNodeField } = actions
+  if (node.internal.type === `DriveNode`) {
+    const { url, name } = node
+    try {
+      const fileNode = await createRemoteFileNode({
+        url,
+        store,
+        cache,
+        createNode,
+        createNodeId,
+        ext: path.extname(node.name),
+      })
+      if (fileNode) {
+        node.localFile___NODE = fileNode.id
+        const slug = name
+          .slice(name.length - 30, name.length)
+          .toLowerCase()
+          .replace(/\W+/g, '-')
+        createNodeField({
+          node,
+          name: 'slug',
+          value: slug
+        })
+      }
+    } catch (e) {
+      console.log(`Error creating remote file`, e)
+    }
+  }
 }
