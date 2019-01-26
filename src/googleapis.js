@@ -1,11 +1,12 @@
 const { GoogleToken } = require('gtoken');
 const request = require('request');
 
-const getToken = keyFile => {
+const getToken = (key, email) => {
   return new Promise((resolve, reject) => {
     const gtoken = new GoogleToken({
-      keyFile,
-      scope: ['https://www.googleapis.com/auth/drive'],
+      key,
+      email,
+      scope: ['https://www.googleapis.com/auth/drive.readonly'],
     });
 
     gtoken.getToken((err, token) => {
@@ -45,14 +46,11 @@ const getFile = (fileId, token) => {
   return new Promise((resolve, reject) => {
     request(
       {
-        uri: `https://www.googleapis.com/drive/v3/files/${fileId}`,
+        uri: `https://www.googleapis.com/drive/v3/files/${fileId}?fields=webContentLink%2C%20createdTime`,
         auth: {
           bearer: token,
         },
-        encoding: null,
-        qs: {
-          alt: 'media',
-        },
+        contentType: 'application/json'
       },
       (err, res, body) => {
         if (err) {
