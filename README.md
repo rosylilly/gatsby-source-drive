@@ -1,4 +1,4 @@
-# gatsby-plugin-drive
+# gatsby-source-drive
 
 Downloads a Google Drive folder and adds graphql nodes for the files.
 
